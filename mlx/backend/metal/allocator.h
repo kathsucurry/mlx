@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <chrono>
+#include <deque>
 #include <map>
 #include <mutex>
 #include <vector>
@@ -13,6 +15,7 @@
 namespace mlx::core::metal {
 
 using allocator::Buffer;
+using allocator::MemoryEvent;
 
 class MetalAllocator : public allocator::Allocator {
   /** Allocator for Metal GPUs. */
@@ -22,6 +25,10 @@ class MetalAllocator : public allocator::Allocator {
   virtual size_t size(Buffer buffer) const override;
   virtual Buffer make_buffer(void* ptr, size_t size) override;
   virtual void release(Buffer buffer) override;
+  virtual void record_memory_events(
+      bool enabled /* = true */,
+      size_t max_entries /* = 0 */) override;
+  virtual std::vector<MemoryEvent> get_memory_events() override;
 
   size_t get_active_memory() {
     return active_memory_;
@@ -58,6 +65,22 @@ class MetalAllocator : public allocator::Allocator {
 
   NS::SharedPtr<MTL::Heap> heap_;
   ResidencySets& residency_sets_;
+
+  // Memory events recorder
+  struct RecordEventsInfo {
+    bool enabled{false};
+    // 0 as the default value represents unlimited entries.
+    size_t max_entries{0};
+    std::chrono::steady_clock::time_point recording_start;
+    std::deque<MemoryEvent> events;
+  };
+
+  RecordEventsInfo record_events_info_{};
+  void maybe_record_events(
+      const void* ptr,
+      size_t size,
+      size_t requested_size,
+      MemoryEvent::Action action);
 
   // Caching allocator
   BufferCache<MTL::Buffer> buffer_cache_;

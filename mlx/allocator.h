@@ -2,9 +2,14 @@
 
 #pragma once
 
+#include <cstdint>
 #include <cstdlib>
+<<<<<<< HEAD
 #include <functional>
 #include <utility>
+=======
+#include <vector>
+>>>>>>> dddb0e21 (memory-viz: Add memory events recording in metal allocator)
 
 #include "mlx/api.h"
 
@@ -41,6 +46,25 @@ class MLX_API Buffer {
   };
 };
 
+struct MLX_API MemoryEvent {
+  enum Action {
+    AllocNew, // Allocates from OS
+    AllocReuse, // Reuse memory from cache
+    AllocMakeBuffer, // Allocates from OS specifically for external memory
+    FreeActiveToCache, // Free active memory to cache
+    FreeActiveToOS, // Free active memory directly to OS
+    Release, // Release active memory to OS specifically for external memory
+    FreeCacheToOS, // Free memory from cache to OS to clear cache
+    Unknown, // N/A
+  };
+
+  const void* buffer_ptr{nullptr};
+  size_t size{0};
+  size_t requested_size{0};
+  int64_t timestamp{0};
+  Action action{Unknown};
+};
+
 class MLX_API Allocator {
   /** Abstract base class for a memory allocator. */
  public:
@@ -51,6 +75,12 @@ class MLX_API Allocator {
     return Buffer{nullptr};
   };
   virtual void release(Buffer buffer) {}
+  virtual void record_memory_events(
+      bool enabled /* = true */,
+      size_t max_entries /* = 0 */) {}
+  virtual std::vector<MemoryEvent> get_memory_events() {
+    return {};
+  }
 
   Allocator() = default;
   Allocator(const Allocator& other) = delete;

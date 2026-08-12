@@ -15,3 +15,5 @@ Memory Management
   set_cache_limit
   set_wired_limit
   clear_cache
+  record_memory_events
+  get_memory_events

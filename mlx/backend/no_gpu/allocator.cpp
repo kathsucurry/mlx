@@ -213,4 +213,11 @@ void clear_cache() {
   allocator::common_allocator().clear_cache();
 }
 
+void record_memory_events(bool enabled, size_t max_entries) {
+  allocator::allocator().record_memory_events(enabled, max_entries);
+}
+std::vector<allocator::MemoryEvent> get_memory_events() {
+  return allocator::allocator().get_memory_events();
+}
+
 } // namespace mlx::core
