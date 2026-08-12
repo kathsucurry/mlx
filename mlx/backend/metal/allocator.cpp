@@ -42,6 +42,8 @@ bool can_reuse_alien_buffer(void* ptr) {
 
 namespace metal {
 
+using Action = allocator::MemoryEvent::Action;
+
 MetalAllocator::MetalAllocator(Device& d)
     : device_(d.mtl_device()),
       residency_sets_(d.residency_sets()),
@@ -52,6 +54,8 @@ MetalAllocator::MetalAllocator(Device& d)
             if (!buf->heap()) {
               residency_sets_.erase(buf);
             }
+            maybe_record_events(
+                buf, buf->length(), buf->length(), Action::FreeCacheToOS);
             auto pool = metal::new_scoped_memory_pool();
             buf->release();
           }) {
@@ -120,6 +124,9 @@ Buffer MetalAllocator::malloc(size_t size) {
     throw std::runtime_error(msg.str());
   }
 
+  // Store the size value before memory alignment
+  size_t requested_size = size;
+
   // Align up memory
   if (size > vm_page_size) {
     size = vm_page_size * ((size + vm_page_size - 1) / vm_page_size);
@@ -127,8 +134,10 @@ Buffer MetalAllocator::malloc(size_t size) {
 
   // Try the cache
   std::unique_lock lk(mutex_);
+  Action action{Action::AllocReuse};
   MTL::Buffer* buf = buffer_cache_.reuse_from_cache(size);
   if (!buf) {
+    action = Action::AllocNew;
     size_t mem_required = get_active_memory() + get_cache_memory() + size;
 
     // If we have a lot of memory pressure try to reclaim memory from the cache
@@ -165,6 +174,7 @@ Buffer MetalAllocator::malloc(size_t size) {
 
   active_memory_ += buf->length();
   peak_memory_ = std::max(peak_memory_, active_memory_);
+  maybe_record_events(buf, buf->length(), requested_size, action);
 
   // Maintain the cache below the requested limit
   if (get_cache_memory() > max_pool_size_) {
@@ -189,11 +199,15 @@ void MetalAllocator::free(Buffer buffer) {
   active_memory_ -= buf->length();
   if (get_cache_memory() < max_pool_size_) {
     buffer_cache_.recycle_to_cache(buf);
+    maybe_record_events(
+        buf, buf->length(), buf->length(), Action::FreeActiveToCache);
   } else {
     num_resources_--;
     if (!buf->heap()) {
       residency_sets_.erase(buf);
     }
+    maybe_record_events(
+        buf, buf->length(), buf->length(), Action::FreeActiveToOS);
     lk.unlock();
     auto pool = metal::new_scoped_memory_pool();
     buf->release();
@@ -214,6 +228,8 @@ Buffer MetalAllocator::make_buffer(void* ptr, size_t size) {
   active_memory_ += buf->length();
   peak_memory_ = std::max(peak_memory_, active_memory_);
   num_resources_++;
+  maybe_record_events(
+      buf, buf->length(), buf->length(), Action::AllocMakeBuffer);
   return Buffer{static_cast<void*>(buf)};
 }
 
@@ -226,9 +242,54 @@ void MetalAllocator::release(Buffer buffer) {
   active_memory_ -= buf->length();
   num_resources_--;
   residency_sets_.erase(buf);
+  maybe_record_events(buf, buf->length(), buf->length(), Action::Release);
   lk.unlock();
   auto pool = metal::new_scoped_memory_pool();
   buf->release();
+}
+
+void MetalAllocator::record_memory_events(
+    bool enabled /* = true */,
+    size_t max_entries /* = 0 */) {
+  std::unique_lock lk(mutex_);
+  record_events_info_.enabled = enabled;
+  record_events_info_.max_entries = max_entries;
+  if (enabled) {
+    record_events_info_.recording_start = std::chrono::steady_clock::now();
+    record_events_info_.events.clear();
+  }
+}
+
+std::vector<MemoryEvent> MetalAllocator::get_memory_events() {
+  std::unique_lock lk(mutex_);
+  return {record_events_info_.events.begin(), record_events_info_.events.end()};
+}
+
+void MetalAllocator::maybe_record_events(
+    const void* buffer_ptr,
+    size_t size,
+    size_t requested_size,
+    Action action) {
+  if (!record_events_info_.enabled)
+    return;
+
+  auto& current_events = record_events_info_.events;
+  if (record_events_info_.max_entries != 0)
+    while (current_events.size() >= record_events_info_.max_entries)
+      current_events.pop_front();
+
+  std::chrono::steady_clock::time_point event_timestamp =
+      std::chrono::steady_clock::now();
+  int64_t time_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                        event_timestamp - record_events_info_.recording_start)
+                        .count();
+  MemoryEvent event = {
+      .buffer_ptr = buffer_ptr,
+      .size = size,
+      .requested_size = requested_size,
+      .timestamp = time_us,
+      .action = action};
+  current_events.push_back(event);
 }
 
 MetalAllocator& allocator() {
@@ -274,6 +335,13 @@ size_t get_cache_memory() {
 }
 void clear_cache() {
   return metal::allocator().clear_cache();
+}
+
+void record_memory_events(bool enabled, size_t max_entries) {
+  metal::allocator().record_memory_events(enabled, max_entries);
+}
+std::vector<allocator::MemoryEvent> get_memory_events() {
+  return metal::allocator().get_memory_events();
 }
 
 } // namespace mlx::core

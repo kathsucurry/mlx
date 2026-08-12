@@ -3,7 +3,9 @@
 #pragma once
 
 #include <cstdlib>
+#include <vector>
 
+#include "mlx/allocator.h"
 #include "mlx/api.h"
 
 namespace mlx::core {
@@ -76,5 +78,10 @@ MLX_API void clear_cache();
  * Returns the previous wired limit.
  * */
 MLX_API size_t set_wired_limit(size_t limit);
+
+/* Enable recording memory events. */
+MLX_API void record_memory_events(bool enabled = true, size_t max_entries = 0);
+// TODO: return a snapshot rather than a vector of raw MemoryEvents.
+MLX_API std::vector<allocator::MemoryEvent> get_memory_events();
 
 } // namespace mlx::core

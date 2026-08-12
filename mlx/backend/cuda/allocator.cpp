@@ -434,4 +434,11 @@ size_t set_wired_limit(size_t) {
   return 0;
 }
 
+void record_memory_events(bool enabled, size_t max_entries) {
+  allocator::allocator().record_memory_events(enabled, max_entries);
+}
+std::vector<allocator::MemoryEvent> get_memory_events() {
+  return allocator::allocator().get_memory_events();
+}
+
 } // namespace mlx::core

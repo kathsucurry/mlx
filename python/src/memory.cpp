@@ -1,11 +1,36 @@
 // Copyright © 2025 Apple Inc.
 
-#include "mlx/memory.h"
+#include <cstdint>
+
 #include <nanobind/nanobind.h>
+#include "mlx/memory.h"
 
 namespace mx = mlx::core;
 namespace nb = nanobind;
 using namespace nb::literals;
+
+static const char* action_label(mx::allocator::MemoryEvent::Action action) {
+  using Action = mx::allocator::MemoryEvent::Action;
+  switch (action) {
+    case Action::AllocNew:
+      return "AllocNew";
+    case Action::AllocReuse:
+      return "AllocReuse";
+    case Action::AllocMakeBuffer:
+      return "AllocMakeBuffer";
+    case Action::FreeActiveToCache:
+      return "FreeActiveToCache";
+    case Action::FreeActiveToOS:
+      return "FreeActiveToOS";
+    case Action::FreeCacheToOS:
+      return "FreeCacheToOS";
+    case Action::Release:
+      return "Release";
+    case Action::Unknown:
+      return "Unknown";
+  }
+  return "Invalid Action";
+}
 
 void init_memory(nb::module_& m) {
   m.def(
@@ -121,5 +146,32 @@ void init_memory(nb::module_& m) {
       Clear the memory cache.
 
       After calling this, :func:`get_cache_memory` should return ``0``.
+      )pbdoc");
+  m.def(
+      "record_memory_events",
+      &mx::record_memory_events,
+      "enabled"_a = true,
+      "max_entries"_a = 0,
+      R"pbdoc(
+      Enable recording memory events.
+      )pbdoc");
+  m.def(
+      "get_memory_events",
+      []() {
+        nb::list out_list;
+        for (const auto& event : mx::get_memory_events()) {
+          nb::dict dict_item;
+          dict_item["buffer_ptr"] =
+              reinterpret_cast<std::uintptr_t>(event.buffer_ptr);
+          dict_item["size"] = event.size;
+          dict_item["requested_size"] = event.requested_size;
+          dict_item["timestamp_us"] = event.timestamp;
+          dict_item["action"] = action_label(event.action);
+          out_list.append(dict_item);
+        }
+        return out_list;
+      },
+      R"pbdoc(
+      Retrieve the current existing memory events.
       )pbdoc");
 }
