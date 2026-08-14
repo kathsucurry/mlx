@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <string>
 #include <vector>
 
 #include "mlx/api.h"
@@ -44,11 +45,17 @@ struct MLX_API MemoryEvent {
     Unknown, // N/A
   };
 
+  static constexpr bool is_alloc(Action action) {
+    return action == AllocNew || action == AllocReuse ||
+        action == AllocMakeBuffer;
+  }
+
   const void* buffer_ptr{nullptr};
   size_t size{0};
   size_t requested_size{0};
   int64_t timestamp{0};
   Action action{Unknown};
+  std::string primitive_name;
 };
 
 class MLX_API Allocator {

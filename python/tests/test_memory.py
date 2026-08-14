@@ -101,11 +101,19 @@ class TestMemory(mlx_tests.MLXTestCase):
         for e in events:
             self.assertEqual(
                 set(e.keys()),
-                {"buffer_ptr", "size", "requested_size", "timestamp_us", "action"},
+                {
+                    "buffer_ptr",
+                    "size",
+                    "requested_size",
+                    "timestamp_us",
+                    "action",
+                    "primitive_name",
+                },
             )
             self.assertGreater(e["buffer_ptr"], 0)
             self.assertGreater(e["size"], 0)
             self.assertGreaterEqual(e["timestamp_us"], 0)
+            self.assertIsInstance(e["primitive_name"], str)
             # Unknown is never emitted; seeing it means a label is unmapped.
             self.assertNotEqual(e["action"], "Unknown")
 
@@ -215,6 +223,53 @@ class TestMemory(mlx_tests.MLXTestCase):
                 if action in ("FreeActiveToOS", "FreeCacheToOS", "Release"):
                     live_buffers.discard(ptr)
         self.assertEqual(live_buffers, set())
+
+    @unittest.skipIf(
+        not mx.metal.is_available(), "Memory events recording are Metal only"
+    )
+    def test_memory_events_recording_primitive_name(self):
+        alloc_actions = {"AllocNew", "AllocReuse", "AllocMakeBuffer"}
+
+        self.addCleanup(mx.record_memory_events, False)
+        mx.synchronize()
+        mx.clear_cache()
+        mx.record_memory_events(True)
+
+        # Use odd dimensions so the matmul output has a distinctive byte size.
+        a = mx.zeros((257, 129))
+        b = mx.zeros((129, 65))
+        mx.eval(a, b)
+        c = mx.matmul(a, b)
+        mx.eval(c)
+        mx.synchronize()
+
+        events = mx.get_memory_events()
+        self.assertGreater(len(events), 0)
+
+        alloc_names = {
+            event["primitive_name"]
+            for event in events
+            if event["action"] in alloc_actions
+        }
+        self.assertIn("Full", alloc_names)
+        self.assertIn("Matmul", alloc_names)
+
+        # The output buffer of the matmul is attributed to Matmul, not to
+        # whichever op happened to run next.
+        matmul_allocs = [
+            event
+            for event in events
+            if event["action"] in alloc_actions
+            and event["requested_size"] == 257 * 65 * 4
+        ]
+        self.assertGreater(len(matmul_allocs), 0)
+        for event in matmul_allocs:
+            self.assertEqual(event["primitive_name"], "Matmul")
+
+        # Primitive names should not be available in memory frees.
+        for event in events:
+            if event["action"] not in alloc_actions:
+                self.assertEqual(event["primitive_name"], "")
 
 
 if __name__ == "__main__":

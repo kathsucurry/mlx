@@ -13,6 +13,7 @@
 #include "mlx/backend/gpu/eval.h"
 #include "mlx/fence.h"
 #include "mlx/memory.h"
+#include "mlx/op_context.h"
 #include "mlx/ops.h"
 #include "mlx/primitives.h"
 #include "mlx/scheduler.h"
@@ -261,7 +262,9 @@ array eval_impl(std::vector<array> outputs, bool async) {
           }
         }
       }
-
+      
+      // Register the primitive name to be used for memory event recording
+      detail::OpContext op_context(arr.primitive().name());
       if (arr.primitive().device() == Device::gpu) {
         gpu::eval(arr);
       } else {

@@ -4,6 +4,7 @@
 #include "mlx/backend/metal/metal.h"
 #include "mlx/backend/metal/resident.h"
 #include "mlx/memory.h"
+#include "mlx/op_context.h"
 
 #include <mach/vm_page_size.h>
 #include <unistd.h>
@@ -258,6 +259,7 @@ void MetalAllocator::record_memory_events(
     record_events_info_.recording_start = std::chrono::steady_clock::now();
     record_events_info_.events.clear();
   }
+  detail::set_op_tracking(enabled);
 }
 
 std::vector<MemoryEvent> MetalAllocator::get_memory_events() {
@@ -289,7 +291,9 @@ void MetalAllocator::maybe_record_events(
       .requested_size = requested_size,
       .timestamp = time_us,
       .action = action};
-  current_events.push_back(event);
+  if (MemoryEvent::is_alloc(action))
+    event.primitive_name = detail::current_op.primitive_name;
+  current_events.push_back(std::move(event));
 }
 
 MetalAllocator& allocator() {

@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include <nanobind/nanobind.h>
+#include <nanobind/stl/string.h>
 #include "mlx/memory.h"
 
 namespace mx = mlx::core;
@@ -167,6 +168,7 @@ void init_memory(nb::module_& m) {
           dict_item["requested_size"] = event.requested_size;
           dict_item["timestamp_us"] = event.timestamp;
           dict_item["action"] = action_label(event.action);
+          dict_item["primitive_name"] = event.primitive_name;
           out_list.append(dict_item);
         }
         return out_list;
