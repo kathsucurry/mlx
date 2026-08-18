@@ -254,6 +254,7 @@ void array::ArrayDesc::init() {
   for (const auto& in : inputs) {
     is_tracer |= in.is_tracer();
   }
+  traceback = detail::capture_traceback();
 }
 
 array::ArrayDesc::ArrayDesc(Shape shape, Dtype dtype)

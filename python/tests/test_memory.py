@@ -108,6 +108,7 @@ class TestMemory(mlx_tests.MLXTestCase):
                     "timestamp_us",
                     "action",
                     "primitive_name",
+                    "traceback",
                 },
             )
             self.assertGreater(e["buffer_ptr"], 0)
@@ -270,6 +271,166 @@ class TestMemory(mlx_tests.MLXTestCase):
         for event in events:
             if event["action"] not in alloc_actions:
                 self.assertEqual(event["primitive_name"], "")
+
+    @unittest.skipIf(
+        not mx.metal.is_available(), "Memory events recording are Metal only"
+    )
+    def test_memory_events_recording_traceback(self):
+        alloc_actions = {"AllocNew", "AllocReuse", "AllocMakeBuffer"}
+
+        self.addCleanup(mx.record_memory_events, False)
+        mx.synchronize()
+        mx.clear_cache()
+        mx.record_memory_events(True)
+
+        # We expect the traceback to point to the lines within make_matmul_output() function.
+        def make_matmul_output():
+            a = mx.zeros((257, 129))
+            b = mx.zeros((129, 65))
+            return mx.matmul(a, b)
+
+        c = make_matmul_output()
+        mx.eval(c)
+        mx.synchronize()
+
+        events = mx.get_memory_events()
+        matmul_allocs = [
+            event
+            for event in events
+            if event["action"] in alloc_actions
+            and event["requested_size"] == 257 * 65 * 4
+        ]
+
+        self.assertGreater(len(matmul_allocs), 0)
+        for event in matmul_allocs:
+            tb = event["traceback"]
+            self.assertIsInstance(tb, list)
+            self.assertGreater(len(tb), 0)
+            for frame in tb:
+                filename, function, line = frame
+                self.assertIsInstance(filename, str)
+                self.assertIsInstance(function, str)
+                self.assertIsInstance(line, int)
+                self.assertGreater(line, 0)
+            # Frames are outermost first, so the creation site is last.
+            filename, function, _ = tb[-1]
+            self.assertTrue(filename.endswith("test_memory.py"))
+            self.assertIn("make_matmul_output", function)
+
+        # Tracebacks are creation-time data; frees should not carry them.
+        for event in events:
+            if event["action"] not in alloc_actions:
+                self.assertIsNone(event["traceback"])
+
+    @unittest.skipIf(
+        not mx.metal.is_available(), "Memory events recording are Metal only"
+    )
+    def test_memory_events_recording_traceback_leaf_array(self):
+        alloc_actions = {"AllocNew", "AllocReuse", "AllocMakeBuffer"}
+
+        self.addCleanup(mx.record_memory_events, False)
+        mx.synchronize()
+        mx.clear_cache()
+        mx.record_memory_events(True)
+
+        # Leaf arrays allocate eagerly on the Python thread with no eval.
+        a = mx.array([1.0] * 1031)
+        mx.synchronize()
+
+        allocs = [
+            event
+            for event in mx.get_memory_events()
+            if event["action"] in alloc_actions and event["requested_size"] == 1031 * 4
+        ]
+        self.assertGreater(len(allocs), 0)
+        for event in allocs:
+            self.assertIsInstance(event["traceback"], list)
+            self.assertTrue(event["traceback"][-1][0].endswith("test_memory.py"))
+
+    @unittest.skipIf(
+        not mx.metal.is_available(), "Memory events recording are Metal only"
+    )
+    def test_memory_events_recording_traceback_disabled_at_creation(self):
+        alloc_actions = {"AllocNew", "AllocReuse", "AllocMakeBuffer"}
+
+        self.addCleanup(mx.record_memory_events, False)
+        mx.synchronize()
+        mx.clear_cache()
+
+        # Created while tracking is off, so no traceback id is captured for this array.
+        a = mx.zeros((4099,))
+        mx.record_memory_events(True)
+        mx.eval(a)
+        mx.synchronize()
+
+        allocs = [
+            event
+            for event in mx.get_memory_events()
+            if event["action"] in alloc_actions and event["requested_size"] == 4099 * 4
+        ]
+        self.assertGreater(len(allocs), 0)
+        for event in allocs:
+            self.assertIsNone(event["traceback"])
+
+    @unittest.skipIf(
+        not mx.metal.is_available(), "Memory events recording are Metal only"
+    )
+    def test_memory_events_recording_traceback_expired_session(self):
+        alloc_actions = {"AllocNew", "AllocReuse", "AllocMakeBuffer"}
+
+        self.addCleanup(mx.record_memory_events, False)
+        mx.synchronize()
+        mx.clear_cache()
+
+        # The id is interned in the first session. Re-enabling starts a new
+        # session and clears the interning table. The stale id must resolve
+        # to None, never to another session's stack.
+        mx.record_memory_events(True)
+        a = mx.zeros((4111,))
+        mx.record_memory_events(True)
+        mx.eval(a)
+        mx.synchronize()
+
+        allocs = [
+            event
+            for event in mx.get_memory_events()
+            if event["action"] in alloc_actions and event["requested_size"] == 4111 * 4
+        ]
+        self.assertGreater(len(allocs), 0)
+        for event in allocs:
+            self.assertIsNone(event["traceback"])
+
+    @unittest.skipIf(
+        not mx.metal.is_available(), "Memory events recording are Metal only"
+    )
+    def test_memory_events_recording_traceback_depth_cap(self):
+        alloc_actions = {"AllocNew", "AllocReuse", "AllocMakeBuffer"}
+
+        self.addCleanup(mx.record_memory_events, False)
+        mx.synchronize()
+        mx.clear_cache()
+        mx.record_memory_events(True)
+
+        def deep_create(depth):
+            if depth > 0:
+                return deep_create(depth - 1)
+            return mx.zeros((4127,))
+
+        a = deep_create(64)
+        mx.eval(a)
+        mx.synchronize()
+
+        allocs = [
+            event
+            for event in mx.get_memory_events()
+            if event["action"] in alloc_actions and event["requested_size"] == 4127 * 4
+        ]
+        self.assertGreater(len(allocs), 0)
+        for event in allocs:
+            tb = event["traceback"]
+            # Captures keep the innermost max_depth (32) frames.
+            self.assertLessEqual(len(tb), 32)
+            self.assertIn("deep_create", tb[-1][1])
 
 
 if __name__ == "__main__":

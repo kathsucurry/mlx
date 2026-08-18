@@ -264,7 +264,7 @@ array eval_impl(std::vector<array> outputs, bool async) {
       }
       
       // Register the primitive name to be used for memory event recording
-      detail::OpContext op_context(arr.primitive().name());
+      detail::OpContext op_context(arr.primitive().name(), arr.traceback_id());
       if (arr.primitive().device() == Device::gpu) {
         gpu::eval(arr);
       } else {

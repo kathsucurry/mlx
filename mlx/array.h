@@ -12,6 +12,7 @@
 #include "mlx/dtype.h"
 #include "mlx/event.h"
 #include "mlx/small_vector.h"
+#include "mlx/traceback.h"
 
 namespace mlx::core {
 
@@ -266,6 +267,10 @@ class MLX_API array {
     bool col_contiguous : 1;
   };
 
+  detail::TracebackId traceback_id() const {
+    return array_desc_->traceback;
+  }
+
   /** The array's primitive. */
   Primitive& primitive() const {
     return *(array_desc_->primitive);
@@ -511,6 +516,9 @@ class MLX_API array {
     std::vector<array> siblings;
     // The arrays position in the output list
     uint32_t position{0};
+
+    // Call site that created this array, when traceback tracking is enabled.
+    detail::TracebackId traceback{detail::no_traceback};
 
     explicit ArrayDesc(Shape shape, Dtype dtype);
 

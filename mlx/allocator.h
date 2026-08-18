@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "mlx/api.h"
+#include "mlx/traceback.h"
 
 namespace mlx::core::allocator {
 
@@ -56,6 +57,7 @@ struct MLX_API MemoryEvent {
   int64_t timestamp{0};
   Action action{Unknown};
   std::string primitive_name;
+  detail::TracebackId traceback{detail::no_traceback};
 };
 
 class MLX_API Allocator {

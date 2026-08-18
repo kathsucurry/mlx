@@ -3,13 +3,16 @@
 #include <atomic>
 #include <string_view>
 
+#include "mlx/traceback.h"
+
 namespace mlx::core::detail {
 
 struct OpInfo {
   std::string_view primitive_name;
+  TracebackId traceback{no_traceback};
 };
 
-// Stores the operation context for each thread.
+/* A thread-specific object for storing the current operation context. */
 inline thread_local OpInfo current_op;
 
 inline std::atomic<bool> op_tracking_enabled{false};
@@ -23,9 +26,12 @@ inline void set_op_tracking(bool enabled) {
 }
 
 struct OpContext {
-  explicit OpContext(std::string_view primitive_name) : active(op_tracking()) {
+  explicit OpContext(
+      std::string_view primitive_name,
+      TracebackId traceback = no_traceback)
+      : active(op_tracking()) {
     if (active)
-      current_op = {.primitive_name = primitive_name};
+      current_op = {.primitive_name = primitive_name, .traceback = traceback};
   }
   ~OpContext() {
     if (active)

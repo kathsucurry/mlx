@@ -5,6 +5,7 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/string.h>
 #include "mlx/memory.h"
+#include "python/src/traceback.h"
 
 namespace mx = mlx::core;
 namespace nb = nanobind;
@@ -150,7 +151,11 @@ void init_memory(nb::module_& m) {
       )pbdoc");
   m.def(
       "record_memory_events",
-      &mx::record_memory_events,
+      [](bool enabled, size_t max_entries) {
+        if (enabled)
+          start_new_traceback_session();
+        mx::record_memory_events(enabled, max_entries);
+      },
       "enabled"_a = true,
       "max_entries"_a = 0,
       R"pbdoc(
@@ -169,6 +174,7 @@ void init_memory(nb::module_& m) {
           dict_item["timestamp_us"] = event.timestamp;
           dict_item["action"] = action_label(event.action);
           dict_item["primitive_name"] = event.primitive_name;
+          dict_item["traceback"] = resolve_traceback(event.traceback);
           out_list.append(dict_item);
         }
         return out_list;
