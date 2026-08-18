@@ -260,6 +260,7 @@ void MetalAllocator::record_memory_events(
     record_events_info_.events.clear();
   }
   detail::set_op_tracking(enabled);
+  detail::set_traceback_tracking(enabled);
 }
 
 std::vector<MemoryEvent> MetalAllocator::get_memory_events() {
@@ -291,8 +292,13 @@ void MetalAllocator::maybe_record_events(
       .requested_size = requested_size,
       .timestamp = time_us,
       .action = action};
-  if (MemoryEvent::is_alloc(action))
+  if (MemoryEvent::is_alloc(action)) {
     event.primitive_name = detail::current_op.primitive_name;
+    event.traceback = detail::current_op.traceback != detail::no_traceback
+        ? detail::current_op.traceback
+        : detail::capture_traceback(); // for leaf arrays (not eval): Python
+                                       // thread + GIL held.
+  }
   current_events.push_back(std::move(event));
 }
 
