@@ -198,6 +198,7 @@ class TestMemory(mlx_tests.MLXTestCase):
         not mx.metal.is_available(), "Memory events recording are Metal only"
     )
     def test_memory_events_recording_buffer_lifetime(self):
+        """Ensures buffers' allocations/deallocations are properly captured."""
         self.addCleanup(mx.record_memory_events, False)
         mx.synchronize()
         mx.clear_cache()
@@ -326,6 +327,7 @@ class TestMemory(mlx_tests.MLXTestCase):
         not mx.metal.is_available(), "Memory events recording are Metal only"
     )
     def test_memory_events_recording_traceback_leaf_array(self):
+        """Ensures leaf arrays' tracebacks are properly captured and attached to events."""
         alloc_actions = {"AllocNew", "AllocReuse", "AllocMakeBuffer"}
 
         self.addCleanup(mx.record_memory_events, False)
@@ -376,6 +378,7 @@ class TestMemory(mlx_tests.MLXTestCase):
         not mx.metal.is_available(), "Memory events recording are Metal only"
     )
     def test_memory_events_recording_traceback_expired_session(self):
+        """Ensures tracebacks from expired sessions are properly handled."""
         alloc_actions = {"AllocNew", "AllocReuse", "AllocMakeBuffer"}
 
         self.addCleanup(mx.record_memory_events, False)
