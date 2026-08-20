@@ -14,7 +14,6 @@ VIZ_FREE_ACTIONS = {"free_completed", "segment_free"}
 
 
 def create_event(action, addr=0x1000, size=4096, ts=0, traceback=None, primitive=""):
-    """Creates an event in the shape mx.get_memory_events() returns."""
     return {
         "buffer_ptr": addr,
         "size": size,
@@ -23,6 +22,7 @@ def create_event(action, addr=0x1000, size=4096, ts=0, traceback=None, primitive
         "action": action,
         "primitive_name": primitive,
         "traceback": traceback,
+        "user_metadata": {"primitive": primitive or "unknown"},
     }
 
 
@@ -66,6 +66,7 @@ class TestMemoryViz(mlx_tests.MLXTestCase):
         self.assertEqual(entry["time_us"], 42)
         self.assertEqual(entry["stream"], 0)
         self.assertEqual(entry["frames"], [])
+        self.assertEqual(entry["user_metadata"], {"primitive": "unknown"})
 
     def test_frames_shape_and_order(self):
         # resolve_traceback() returns (filename, function, line) tuples with
@@ -93,11 +94,15 @@ class TestMemoryViz(mlx_tests.MLXTestCase):
 
     def test_category_from_primitive_name(self):
         trace = to_snapshot([create_event("AllocReuse", primitive="Matmul")])
-        self.assertEqual(trace["device_traces"][0][0]["category"], "Matmul")
+        (entry,) = trace["device_traces"][0]
+        self.assertEqual(entry["category"], "Matmul")
+        self.assertEqual(entry["user_metadata"], {"primitive": "Matmul"})
 
         # Empty primitive names fall back to the viz's default category.
         trace = to_snapshot([create_event("AllocReuse", primitive="")])
-        self.assertEqual(trace["device_traces"][0][0]["category"], "unknown")
+        (entry,) = trace["device_traces"][0]
+        self.assertEqual(entry["category"], "unknown")
+        self.assertEqual(entry["user_metadata"], {"primitive": "unknown"})
 
     def test_both_timelines_pair_allocs_with_frees(self):
         # The PyTorch's viz matches frees to allocs by address, separately per timeline.

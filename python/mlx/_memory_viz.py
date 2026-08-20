@@ -32,6 +32,7 @@ def to_snapshot(events):
             "time_us": event["timestamp_us"],
             "frames": _frames(event.get("traceback")),
             "category": event.get("primitive_name") or "unknown",
+            "user_metadata": {"primitive": event.get("primitive_name") or "unknown"},
         }
         # A buffer can appear on both timelines.
         if event["action"] in _SEGMENT_ALLOC:
