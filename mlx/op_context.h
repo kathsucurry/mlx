@@ -9,6 +9,7 @@ namespace mlx::core::detail {
 
 struct OpInfo {
   std::string_view primitive_name;
+  int stream{-1};
   TracebackId traceback{no_traceback};
 };
 
@@ -28,10 +29,14 @@ inline void set_op_tracking(bool enabled) {
 struct OpContext {
   explicit OpContext(
       std::string_view primitive_name,
+      int stream,
       TracebackId traceback = no_traceback)
       : active(op_tracking()) {
     if (active)
-      current_op = {.primitive_name = primitive_name, .traceback = traceback};
+      current_op = {
+          .primitive_name = primitive_name,
+          .stream = stream,
+          .traceback = traceback};
   }
   ~OpContext() {
     if (active)

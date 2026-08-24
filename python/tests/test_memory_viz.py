@@ -13,14 +13,17 @@ VIZ_ALLOC_ACTIONS = {"alloc", "segment_alloc"}
 VIZ_FREE_ACTIONS = {"free_completed", "segment_free"}
 
 
-def create_event(action, addr=0x1000, size=4096, ts=0, traceback=None, primitive=""):
+def create_event(
+    action, addr=0x1000, size=4096, ts=0, traceback=None, primitive="", stream=0
+):
     return {
-        "buffer_ptr": addr,
+        "addr": addr,
         "size": size,
         "requested_size": size,
         "timestamp_us": ts,
         "action": action,
         "primitive_name": primitive,
+        "stream": stream,
         "traceback": traceback,
         "user_metadata": {"primitive": primitive or "unknown"},
     }
