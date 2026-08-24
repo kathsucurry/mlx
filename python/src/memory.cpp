@@ -167,13 +167,13 @@ void init_memory(nb::module_& m) {
         nb::list out_list;
         for (const auto& event : mx::get_memory_events()) {
           nb::dict dict_item;
-          dict_item["buffer_ptr"] =
-              reinterpret_cast<std::uintptr_t>(event.buffer_ptr);
+          dict_item["addr"] = event.addr;
           dict_item["size"] = event.size;
           dict_item["requested_size"] = event.requested_size;
           dict_item["timestamp_us"] = event.timestamp;
           dict_item["action"] = action_label(event.action);
           dict_item["primitive_name"] = event.primitive_name;
+          dict_item["stream"] = event.stream;
           dict_item["traceback"] = resolve_traceback(event.traceback);
           out_list.append(dict_item);
         }

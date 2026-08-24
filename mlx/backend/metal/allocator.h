@@ -77,7 +77,7 @@ class MetalAllocator : public allocator::Allocator {
 
   RecordEventsInfo record_events_info_{};
   void maybe_record_events(
-      const void* ptr,
+      MTL::Buffer* buf,
       size_t size,
       size_t requested_size,
       MemoryEvent::Action action);

@@ -102,19 +102,21 @@ class TestMemory(mlx_tests.MLXTestCase):
             self.assertEqual(
                 set(e.keys()),
                 {
-                    "buffer_ptr",
+                    "addr",
                     "size",
                     "requested_size",
                     "timestamp_us",
                     "action",
                     "primitive_name",
+                    "stream",
                     "traceback",
                 },
             )
-            self.assertGreater(e["buffer_ptr"], 0)
+            self.assertGreater(e["addr"], 0)
             self.assertGreater(e["size"], 0)
             self.assertGreaterEqual(e["timestamp_us"], 0)
             self.assertIsInstance(e["primitive_name"], str)
+            self.assertIsInstance(e["stream"], int)
             # Unknown is never emitted; seeing it means a label is unmapped.
             self.assertNotEqual(e["action"], "Unknown")
 
@@ -214,7 +216,7 @@ class TestMemory(mlx_tests.MLXTestCase):
         # Replay the memory events: every buffer's transitions must be consistent.
         live_buffers = set()
         for event in mx.get_memory_events():
-            ptr, action = event["buffer_ptr"], event["action"]
+            ptr, action = event["addr"], event["action"]
             if action in ("AllocNew", "AllocMakeBuffer"):
                 self.assertNotIn(ptr, live_buffers)
                 live_buffers.add(ptr)

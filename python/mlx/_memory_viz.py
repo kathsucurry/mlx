@@ -24,10 +24,10 @@ def to_snapshot(events):
     trace = []
     for event in events:
         entry = {
-            "addr": event["buffer_ptr"],
+            "addr": event["addr"],
             "size": event["size"],
             "requested_size": event["requested_size"],
-            "stream": 0,  # TODO: add properly.
+            "stream": event["stream"],
             "version": 0,
             "time_us": event["timestamp_us"],
             "frames": _frames(event.get("traceback")),

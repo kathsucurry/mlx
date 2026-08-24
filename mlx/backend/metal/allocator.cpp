@@ -269,7 +269,7 @@ std::vector<MemoryEvent> MetalAllocator::get_memory_events() {
 }
 
 void MetalAllocator::maybe_record_events(
-    const void* buffer_ptr,
+    MTL::Buffer* buf,
     size_t size,
     size_t requested_size,
     Action action) {
@@ -287,16 +287,17 @@ void MetalAllocator::maybe_record_events(
                         event_timestamp - record_events_info_.recording_start)
                         .count();
   MemoryEvent event = {
-      .buffer_ptr = buffer_ptr,
+      .addr = reinterpret_cast<std::uintptr_t>(buf->contents()),
       .size = size,
       .requested_size = requested_size,
       .timestamp = time_us,
       .action = action};
   if (MemoryEvent::is_alloc(action)) {
     event.primitive_name = detail::current_op.primitive_name;
+    event.stream = detail::current_op.stream;
     event.traceback = detail::current_op.traceback != detail::no_traceback
         ? detail::current_op.traceback
-        : detail::capture_traceback(); // for leaf arrays (not eval): Python
+        : detail::capture_traceback(); // for leaf arrays (not in eval): Python
                                        // thread + GIL held.
   }
   current_events.push_back(std::move(event));

@@ -51,12 +51,13 @@ struct MLX_API MemoryEvent {
         action == AllocMakeBuffer;
   }
 
-  const void* buffer_ptr{nullptr};
+  uintptr_t addr{0};
   size_t size{0};
   size_t requested_size{0};
   int64_t timestamp{0};
   Action action{Unknown};
   std::string primitive_name;
+  int stream{-1}; // The stream index is only stored during non-leaf allocations
   detail::TracebackId traceback{detail::no_traceback};
 };
 
