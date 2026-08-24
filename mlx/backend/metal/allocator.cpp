@@ -283,14 +283,20 @@ void MetalAllocator::maybe_record_events(
 
   std::chrono::steady_clock::time_point event_timestamp =
       std::chrono::steady_clock::now();
-  int64_t time_us = std::chrono::duration_cast<std::chrono::microseconds>(
-                        event_timestamp - record_events_info_.recording_start)
-                        .count();
+  uint64_t elapsed_us =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          event_timestamp - record_events_info_.recording_start)
+          .count();
+  int64_t timestamp_us =
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count();
   MemoryEvent event = {
       .addr = reinterpret_cast<std::uintptr_t>(buf->contents()),
       .size = size,
       .requested_size = requested_size,
-      .timestamp = time_us,
+      .timestamp_us = timestamp_us,
+      .elapsed_us = elapsed_us,
       .action = action};
   if (MemoryEvent::is_alloc(action)) {
     event.primitive_name = detail::current_op.primitive_name;

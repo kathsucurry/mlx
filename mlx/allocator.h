@@ -54,7 +54,8 @@ struct MLX_API MemoryEvent {
   uintptr_t addr{0};
   size_t size{0};
   size_t requested_size{0};
-  int64_t timestamp{0};
+  int64_t timestamp_us;
+  uint64_t elapsed_us;
   Action action{Unknown};
   std::string primitive_name;
   int stream{-1}; // The stream index is only stored during non-leaf allocations

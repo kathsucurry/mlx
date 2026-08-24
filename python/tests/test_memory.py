@@ -106,6 +106,7 @@ class TestMemory(mlx_tests.MLXTestCase):
                     "size",
                     "requested_size",
                     "timestamp_us",
+                    "elapsed_us",
                     "action",
                     "primitive_name",
                     "stream",
@@ -115,13 +116,14 @@ class TestMemory(mlx_tests.MLXTestCase):
             self.assertGreater(e["addr"], 0)
             self.assertGreater(e["size"], 0)
             self.assertGreaterEqual(e["timestamp_us"], 0)
+            self.assertGreaterEqual(e["elapsed_us"], 0)
             self.assertIsInstance(e["primitive_name"], str)
             self.assertIsInstance(e["stream"], int)
             # Unknown is never emitted; seeing it means a label is unmapped.
             self.assertNotEqual(e["action"], "Unknown")
 
-        stamps = [e["timestamp_us"] for e in events]
-        self.assertEqual(stamps, sorted(stamps))
+        elapsed_stamps = [e["elapsed_us"] for e in events]
+        self.assertEqual(elapsed_stamps, sorted(elapsed_stamps))
 
     @unittest.skipIf(
         not mx.metal.is_available(), "Memory events recording are Metal only"

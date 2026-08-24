@@ -170,7 +170,8 @@ void init_memory(nb::module_& m) {
           dict_item["addr"] = event.addr;
           dict_item["size"] = event.size;
           dict_item["requested_size"] = event.requested_size;
-          dict_item["timestamp_us"] = event.timestamp;
+          dict_item["timestamp_us"] = event.timestamp_us;
+          dict_item["elapsed_us"] = event.elapsed_us;
           dict_item["action"] = action_label(event.action);
           dict_item["primitive_name"] = event.primitive_name;
           dict_item["stream"] = event.stream;
