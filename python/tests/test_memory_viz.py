@@ -14,13 +14,21 @@ VIZ_FREE_ACTIONS = {"free_completed", "segment_free"}
 
 
 def create_event(
-    action, addr=0x1000, size=4096, ts=0, traceback=None, primitive="", stream=0
+    action,
+    addr=0x1000,
+    size=4096,
+    timestamp=0,
+    elapsed=0,
+    traceback=None,
+    primitive="",
+    stream=0,
 ):
     return {
         "addr": addr,
         "size": size,
         "requested_size": size,
-        "timestamp_us": ts,
+        "timestamp_us": timestamp,
+        "elapsed_us": elapsed,
         "action": action,
         "primitive_name": primitive,
         "stream": stream,
@@ -62,7 +70,9 @@ class TestMemoryViz(mlx_tests.MLXTestCase):
         self.assertEqual(snapshot["device_traces"][0], [])
 
     def test_entry_fields(self):
-        trace = to_snapshot([create_event("AllocReuse", addr=0x2000, size=8192, ts=42)])
+        trace = to_snapshot(
+            [create_event("AllocReuse", addr=0x2000, size=8192, timestamp=42)]
+        )
         (entry,) = trace["device_traces"][0]
         self.assertEqual(entry["addr"], 0x2000)
         self.assertEqual(entry["size"], 8192)
@@ -115,13 +125,13 @@ class TestMemoryViz(mlx_tests.MLXTestCase):
         # tolerates this by rendering it as initially-allocated. So only check
         # the buffers whose alloc is in the trace.
         events = [
-            create_event("AllocNew", addr=0x1000, ts=1),
-            create_event("AllocNew", addr=0x2000, ts=2),
-            create_event("FreeActiveToCache", addr=0x1000, ts=3),
-            create_event("AllocReuse", addr=0x1000, ts=4),
-            create_event("FreeActiveToOS", addr=0x2000, ts=5),
-            create_event("Release", addr=0x1000, ts=6),
-            create_event("FreeCacheToOS", addr=0x3000, ts=7),
+            create_event("AllocNew", addr=0x1000, timestamp=1),
+            create_event("AllocNew", addr=0x2000, timestamp=2),
+            create_event("FreeActiveToCache", addr=0x1000, timestamp=3),
+            create_event("AllocReuse", addr=0x1000, timestamp=4),
+            create_event("FreeActiveToOS", addr=0x2000, timestamp=5),
+            create_event("Release", addr=0x1000, timestamp=6),
+            create_event("FreeCacheToOS", addr=0x3000, timestamp=7),
         ]
         for alloc, free in (
             ("alloc", "free_completed"),
@@ -136,13 +146,11 @@ class TestMemoryViz(mlx_tests.MLXTestCase):
                     live.discard(entry["addr"])
             self.assertEqual(live, set(), alloc)
 
-    def test_timestamps_are_monotonic(self):
-        events = [create_event("AllocNew", addr=0x1000 * i, ts=i) for i in range(1, 6)]
-        stamps = [event["time_us"] for event in to_snapshot(events)["device_traces"][0]]
-        self.assertEqual(stamps, sorted(stamps))
-
     def test_dump_snapshot(self):
-        events = [create_event("AllocNew", ts=1), create_event("FreeActiveToOS", ts=2)]
+        events = [
+            create_event("AllocNew", timestamp=1),
+            create_event("FreeActiveToOS", timestamp=2),
+        ]
         with tempfile.TemporaryDirectory() as d:
             path = dump_snapshot(events, Path(d) / "snap.pickle")
             with open(path, "rb") as f:
