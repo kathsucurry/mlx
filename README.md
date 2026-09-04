@@ -1,3 +1,36 @@
+### Changes added to this branch
+
+Enables memory event recording and dumping the recorded events into a pickle file loadable by PyTorch's [memory viz](https://docs.pytorch.org/memory_viz).
+
+<img width="1252" height="736" alt="Screenshot 2026-09-04 at 10 36 01 AM" src="https://github.com/user-attachments/assets/9396a044-cb68-4dc7-8f70-ac60dd7ba9f0" />
+
+(The screenshot above was created using the code [here](https://github.com/kathsucurry/mlx-gpt-dev). If you're wondering why there's nothing allocated in between the iterations, that's because the data is allocated outside of memory recording, and currently, only `device_traces` is implemented.)
+
+
+To enable memory event recording, simply use the functionality as follows.
+```
+import mlx.core as mx
+from mlx._memory_viz import dump_snapshot
+
+# 1. Turn on the recording.
+mx.record_memory_events(enabled=True, max_entries=100000)
+
+# 2. Add things to record.
+# ...
+
+# 3. Get the memory events, either:
+# 3.1. Get a list of event dictionaries to play around with, or
+events = mx.get_memory_events()
+
+# 3.2. Dump the events into a pickle file compatible with PyTorch's memory viz.
+dump_snapshot(mx.get_memory_events(), "output.pickle")
+
+# 4. Turn off the recording.
+mx.record_memory_events(enabled=False)
+```
+
+---
+
 # MLX
 
 [**Quickstart**](#quickstart) | [**Installation**](#installation) |
