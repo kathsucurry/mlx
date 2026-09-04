@@ -22,18 +22,35 @@ def _frames(traceback):
 def to_snapshot(events):
     """Builds a snapshot dict from mx.get_memory_events()."""
     trace = []
+    alloc_addrs_infos = dict()
     for event in events:
+        primitive_name = event.get("primitive_name") or "unknown"
+        frames = _frames(event.get("traceback"))
+        stream = event["stream"]
+
+        # Replace some of the free's fields with alloc's fields.
+        # TODO: add proper tests.
+        if event["action"] in _ALLOC_ACTIONS:
+            alloc_addrs_infos[event["addr"]] = (
+                event["stream"],
+                primitive_name,
+                frames,
+            )
+        elif event["action"] in _FREE_ACTIONS and event["addr"] in alloc_addrs_infos:
+            stream, primitive_name, frames = alloc_addrs_infos.pop(event["addr"])
+
         entry = {
             "addr": event["addr"],
             "size": event["size"],
             "requested_size": event["requested_size"],
-            "stream": event["stream"],
+            "stream": stream,
             "version": 0,
             "time_us": event["timestamp_us"],
-            "frames": _frames(event.get("traceback")),
-            "category": event.get("primitive_name") or "unknown",
-            "user_metadata": {"primitive": event.get("primitive_name") or "unknown"},
+            "frames": frames,
+            "category": primitive_name,
+            "user_metadata": {"primitive": primitive_name},
         }
+
         # A buffer can appear on both timelines.
         if event["action"] in _SEGMENT_ALLOC:
             trace.append({**entry, "action": "segment_alloc"})
